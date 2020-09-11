@@ -9,6 +9,8 @@ import SimpleITK as sitk
 import numpy as np
 import os
 
+
+
 def apply_transform(reference, transform, image):
     """This command does the same thing as the antsApplyTransforms does (test passed.).
        The interpolator of the resampler can be changed.
@@ -128,7 +130,7 @@ def resample_image(itk_image, out_spacing=[0.5,0.5,0.5], is_label=False):
     
     return resampled_final
 
-def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_matrices, target_image, out_file):
+def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_matrices, target_image):
     """This function transform point to physical space
     inputs: simple itk image/transform object. bvec and bval are file string. input images are should be in simpleITK image format.
     output: 1. index shows index of the first element in a voxel and number of elements per voxel
@@ -194,11 +196,12 @@ def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_mat
     rotation_matrices_array = sitk.GetArrayFromImage(rotation_matrices)
 
 
-    # initiate output array
-    index_image = sitk.Image(tdimx, tdimy, tdimz, 2, sitk.sitkInt16)
+    # initiate output array    index_image1 = sitk.Image(tdimx, tdimy, tdimz, sitk.sitkInt16)
+    index_image = np.zeros((2,tdimz,tdimy,tdimx))
     dwibvals = np.array([])
-    dwibvecs = np.array([])
+    dwibvecs = np.array([]).reshape(0,3)
     dwivalues = np.array([])
+
 
     # use a dictionary to store the transformed values.
     big_dict = {}
@@ -217,14 +220,23 @@ def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_mat
     for k,j,i in np.ndindex(tdimz,tdimy,tdimx):
         if (i,j,k) in big_dict:
             size = len(big_dict[(i,j,k)][0])
-            index_image[i,j,k,0] = start_index
-            index_image[i,j,k,1] = size
-            dwibvals.extend(big_dict[(i,j,k)][0])
-            dwibvecs.extend(big_dict[(i,j,k)][1])
-            dwivalues.extend(big_dict[(i,j,k)][2])
+            index_image[0,k,j,i] = start_index
+            index_image[1,k,j,i] = size
+            dwibvals=np.append(dwibvals, big_dict[(i,j,k)][0])
+            dwibvecs=np.vstack(dwibvecs, big_dict[(i,j,k)][1])
+            dwivalues=np.append(dwivalues, big_dict[(i,j,k)][2])
             start_index += size
 
-    return
+    index_img = sitk.JoinSeries([sitk.GetImageFromArray(index_image[0],False), sitk.GetImageFromArray(index_image[1],False)])
+    index_img.CopyInformation(target_image)
+
+    # os.mkdir(out_file)
+    # sitk.WriteImage(index_img, f"{out_file}/index.nii.gz")
+    # np.save(dwibvals, f"{out_file}/dwibvals.npy")
+    # np.save(dwibvals, f"{out_file}/dwibvecs.npy")
+    # np.save(dwivalues, f"{out_file}/dwivalues.npy")
+
+    return index_img, dwibvals, dwibvecs, dwivalues
 
 def rotate_vectors(vector, rotation_matrix): 
     """This function rotate a vector using an 3x3 rotation_matrix

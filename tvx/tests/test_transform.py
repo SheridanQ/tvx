@@ -39,14 +39,14 @@ def test_sort_big_dict():
     assert_array_equal(expected_count_list, count_list)
 
 def test_append_array():
-    append_array=np.array([])
-    vector1 = np.array([1,2,3])
-    vector2 = np.array([4,5,6])
+    vector0 = np.array([]).reshape(0,3)
+    vector1 = [np.array([1,2,3]),np.array([4,5,6])]
+    vector2 = [np.array([4,5,6])]
 
-    final_array = np.append([append_array],[vector1])
-    final_array = np.append([final_array],[vector2])
-
+    vector1 = np.vstack((vector0,vector1))
+    final_array = np.vstack((vector1,vector2))
     size = final_array.shape
-    expected_size = (2,3)
-
+    expected_size = (3,3)
+    print(size)
     assert_array_equal(size, expected_size)
+

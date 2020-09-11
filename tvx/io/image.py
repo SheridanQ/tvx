@@ -44,3 +44,8 @@ def print_info(image):
     print("Origin:{}".format(image.GetOrigin()))
     print("Size:{}".format(image.GetSize()))
     print("PixelNo:{}".format(image.GetNumberOfPixels()))
+
+def subsample_image(image, tuple_range, tuple_size):
+    i,j,k,t =
+    sub_image = np.zeros(tuple_size)
+    tdim = sub_dwi_image.shape[0]
