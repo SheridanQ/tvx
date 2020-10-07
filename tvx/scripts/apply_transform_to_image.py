@@ -1,54 +1,54 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
+Created on Wed Oct  7 14:16:09 2020
+
 @author: xiaoxiaoqi
 """
 import os
+import sys
+import json
 
 import SimpleITK as sitk
 import numpy as np
 
 from tvx.io.image import read_image
 from tvx.io.displacement import get_displacement
-from tvx.transform.apply_transform import transform_point, resample_image
+from tvx.transform.apply_transform import transform_point
 
-## Read images
-dwi_image = read_image("/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/dwi/babu_8-dwis.nii.gz")
-dwi_mask_image = read_image("/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/dwi/babu_8-mask.nii.gz")
-dp_image = read_image("/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/displacement_field/1mm/babu_8_fod_composedwarp.nii.gz")
-inv_dp_image = read_image("/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/displacement_field/1mm/babu_8_fod_composedinvwarp.nii.gz")
-ref_image = read_image("/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/target/new_atlas_our_65_95_static_BrainCerebellum.nii.gz")
+dwipath = sys.argv[1]
+dwimaskpath = sys.argv[2]
 
-## Read bvecs and bvals
-bvecs = "/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/dwi/babu_8.bvecs"
-bvals = "/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/dwi/babu_8.bvals"
+bvecpath = sys.argv[3]
+bvalpath = sys.argv[4]
 
-## Read displacement
-transform = get_displacement(dp_image)
+inv_dp_path = sys.argv[5]
+ref_path = sys.argv[6]
+rotationpath = sys.argv[7]
+
+outputdir = sys.argv[8]
+
+
+dwi_image = read_image(dwipath)
+dwi_mask_image = read_image(dwimaskpath)
+
+ref_image = read_image(ref_path)
+rotation_matrices = read_image
+
+inv_dp_image = read_image(inv_dp_path)
 inv_transform = get_displacement(inv_dp_image)
 
-## Read Rotation
-rotation_matrices = read_image("/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/displacement_field/1mm/babu_8_rotation_inv.nii.gz")
-
-outputdir = "/Users/xiaoxiaoqi/PycharmProjects/qball_csd/test_data/test_results/babu_8"
 if not os.path.isdir(outputdir):
     os.mkdir(outputdir)
-#%%
-up_dwi_image = resample_image(dwi_image, out_spacing = [1,1,1])
-up_dwi_mask_image = resample_image(dwi_mask_image, out_spacing = [1,1,1], is_label=True)
-#%%
-#index_img, dwibvals, dwibvecs, dwivalues = transform_point(dwi_image, dwi_mask_image, bvecs, bvals, inv_transform, rotation_matrices, ref_image)
-big_dict, index_img = transform_point(dwi_image, dwi_mask_image, bvecs, bvals, inv_transform, rotation_matrices, ref_image)
-
-
-sitk.WriteImage(index_img, f"{outputdir}/index_inv_dwi.nii.gz")
-# np.save(dwibvals, f"{outputdir}/dwibvals.npy")
-# np.save(dwibvals, f"{outputdir}/dwibvecs.npy")
-# np.save(dwivalues, f"{outputdir}/dwivalues.npy")
-
-
-# import json
-# with open(f'{outputdir}/data_inv_noref.json','w') as fp:
-#     json.dump(big_dict, fp)
-
-
-
+    
+bvals_dict, bvecs_dict, dwivalues_dict, index1, index2 = transform_point(dwi_image, dwi_mask_image, bvecpath, bvalpath, \
+                                                                         inv_transform, rotation_matrices, ref_image)
+    
+sitk.WriteImage(index1, f"{outputdir}/checking_image.nii.gz")
+sitk.WriteImage(index2, f"{outputdir}/stats_image.nii.gz")
+with open(f'{outputdir}/bvals.json','w') as fp:
+    json.dump(bvals_dict, fp)
+with open(f'{outputdir}/bvecs.json','w') as fp:
+    json.dump(bvals_dict, fp)
+with open(f'{outputdir}/dwivalues.json','w') as fp:
+    json.dump(bvals_dict, fp)
