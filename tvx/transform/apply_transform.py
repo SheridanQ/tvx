@@ -158,17 +158,32 @@ def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_mat
         px,py,pz = inv_transform.TransformPoint((xx,yy,zz))
         tx,ty,tz = target_image.TransformPhysicalPointToIndex([px,py,pz])
         # deal with nonsense values. Test codes has shown the valuse are at two ends.
-        if tx <= 0 or tx >= dimx: tx = 0
-        if ty <= 0 or ty >= dimy: ty = 0
-        if tz <= 0 or tz >= dimz: tz = 0
+        if tx <= 0:
+            tx = tx + tdimx
+        elif tx >= tdimx: 
+            tx = tx - tdimx
+        if ty <= 0:
+            ty = ty + tdimy
+        elif ty >= tdimx:
+            ty = ty - tdimy
+        if tz <= 0:
+            tz = tz + tdimz
+        elif tz >= tdimz:
+            tz = tz - tdimz
+        
+
+        # print(f'original: {i},{i},{k}')
+        # print(f'rawksjdf: {xx},{yy},{zz}')
+        # print(f'physical: {px},{py},{pz}')
+        # print(f'transfor: {tx},{ty},{tz}')
 
         return tx,ty,tz
     
-    def _transform_point_values(i,j,k,t, dwi_image_array, rotation_matrices_array):
+    def _transform_point_values(i,j,k,tx,ty,tz, dwi_image_array, rotation_matrices_array):
         """i,j,k are the x,y,z index of the input moving image
         return the expecte values in the new position.
         :type i j k t: int
-        :rtype dwibval: float
+        :rtype dwibval: array(float)
         :rtype dwibvec: array
         :rtype dwivalue: float
         """
@@ -176,12 +191,12 @@ def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_mat
         rotation = get_rotation_matrix(rotation_matrice)
         # use array to store values and vector.
         
-        dwibval = bvals[t]
-        dwibvec = rotate_vectors(bvecs[t],rotation)
-        dwivalue = dwi_image_array[t,k,j,i]
+        dwibval = bvals.tolist()
+        dwibvec = rotate_vectors(bvecs,rotation).tolist()
+        dwivalue = [np.float64(x) for x in dwi_image_array[:,k,j,i].tolist()]
         
         return dwibval, dwibvec, dwivalue
-        
+
     # borrow function from dipy
     from dipy.io import read_bvals_bvecs  
     # :type:string, :rtype:array
@@ -190,6 +205,7 @@ def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_mat
     # initiate the index_image in the beginning
     dimx, dimy, dimz, dimt = dwi_image.GetSize()
     tdimx,tdimy,tdimz = target_image.GetSize()
+    txorg,tyorg,tzorg = target_image.GetOrigin()
 
     dwi_image_array = sitk.GetArrayFromImage(dwi_image)
     dwi_mask_array = sitk.GetArrayFromImage(dwi_mask)
@@ -205,51 +221,66 @@ def transform_point(dwi_image, dwi_mask, bvec, bval, inv_transform, rotation_mat
 
     # use a dictionary to store the transformed values.
     big_dict = {}
-    for t,k,j,i in np.ndindex(dimt, dimz, dimy, dimx):
-        if dwi_mask_array[t,k,j,i] > 0.5: ## a 4D mask array. If array has value, do computation.
+    count = 0
+    for k,j,i in np.ndindex(dimz, dimy, dimx):
+    # for k in range(70,75):
+    #     for j in range(70,75):
+    #         for i in range(50,55):
+    #             print(f'coord {k},{j},{i}')
+        if dwi_mask_array[k,j,i] > 0.5: ## a 4D mask array. If array has value, do computation. For testing purpose, 3D mask.!!!!!
+            count+=1
+            if count % 1000 == 0:
+                print(f'Counts: {count}')
+
             tx,ty,tz = _transform_point_index(i,j,k)
-            dwibval, dwibvec, dwivalue = _transform_point_values(i,j,k,t, dwi_image_array, rotation_matrices_array)
-            if (tx,ty,tz) not in big_dict:
-                big_dict[(tx,ty,tz)] = [[],[],[]]
-            voxel = big_dict[(tx,ty,tz)]
-            voxel[0].append(dwibval)
-            voxel[1].append(dwibvec)
-            voxel[2].append(dwivalue)
+            # if count > 50000:
+            #     print(f'new coords is: {tx},{ty},{tz}')
 
-    start_index = 0
-    for k,j,i in np.ndindex(tdimz,tdimy,tdimx):
-        if (i,j,k) in big_dict:
-            size = len(big_dict[(i,j,k)][0])
-            index_image[0,k,j,i] = start_index
-            index_image[1,k,j,i] = size
-            dwibvals=np.append(dwibvals, big_dict[(i,j,k)][0])
-            dwibvecs=np.vstack(dwibvecs, big_dict[(i,j,k)][1])
-            dwivalues=np.append(dwivalues, big_dict[(i,j,k)][2])
-            start_index += size
-
-    index_img = sitk.JoinSeries([sitk.GetImageFromArray(index_image[0],False), sitk.GetImageFromArray(index_image[1],False)])
-    index_img.CopyInformation(target_image)
-
-    # os.mkdir(out_file)
-    # sitk.WriteImage(index_img, f"{out_file}/index.nii.gz")
-    # np.save(dwibvals, f"{out_file}/dwibvals.npy")
-    # np.save(dwibvals, f"{out_file}/dwibvecs.npy")
-    # np.save(dwivalues, f"{out_file}/dwivalues.npy")
-
-    return index_img, dwibvals, dwibvecs, dwivalues
-
-def rotate_vectors(vector, rotation_matrix): 
-    """This function rotate a vector using an 3x3 rotation_matrix
+            dwibval, dwibvec, dwivalue = _transform_point_values(i,j,k,tx,ty,tz,dwi_image_array, rotation_matrices_array)
+            key_string = f'{tx},{ty},{tz}'
+            if key_string not in big_dict:
+                big_dict[key_string] = [[],[],[]]
+                #index_image[1,tz,ty,tx] = 0
+            voxel = big_dict[key_string]
+            voxel[0].extend(dwibval)
+            voxel[1].extend(dwibvec)
+            voxel[2].extend(dwivalue)
+            index_image[0,tz,ty,tx] += dwivalue[0]
+            index_image[1,tz,ty,tx] += np.count_nonzero(dwibval)
     
-    :type vector: array
+    # start_index = 0
+    # for k,j,i in np.ndindex(tdimz,tdimy,tdimx):
+    #     if (i,j,k) in big_dict:
+    #         size = len(big_dict[(i,j,k)][0])
+    #         index_image[0,k,j,i] = start_index
+    #         index_image[1,k,j,i] = size
+    #         dwibvals=np.append(dwibvals, big_dict[(i,j,k)][0])
+    #         dwibvecs=np.vstack((dwibvecs, big_dict[(i,j,k)][1]))
+    #         dwivalues=np.append(dwivalues, big_dict[(i,j,k)][2])
+    #         start_index += size
+    #
+    index1 = sitk.GetImageFromArray(index_image[0],False)
+    index2 = sitk.GetImageFromArray(index_image[1],False)
+    index1.CopyInformation(target_image)
+    index2.CopyInformation(target_image)
+    index_img = sitk.JoinSeries([index1, index2])
+    
+
+    # return index_img, dwibvals, dwibvecs, dwivalues
+    return big_dict, index_img
+
+def rotate_vectors(vectors, rotation_matrix):
+    """This function rotate a vector using an 3x3 rotation_matrix
+
+    :type vector: array[array]
     :type rotation_matrix: array[array[]]
     :rtype: array
     """
-    return np.dot(rotation_matrix, vector) # order matters
-        
+    return np.dot(rotation_matrix, vectors.T).T # order matters
+
 def get_rotation_matrix(rotation_matrice):
     """ This function decompose a value in rotation_matrices to an affine rotation matrix
-    
+
     :type rotation_matrice: array 1d
     :rtype: array 2d
     """

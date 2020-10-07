@@ -47,6 +47,5 @@ def test_append_array():
     final_array = np.vstack((vector1,vector2))
     size = final_array.shape
     expected_size = (3,3)
-    print(size)
     assert_array_equal(size, expected_size)
 
