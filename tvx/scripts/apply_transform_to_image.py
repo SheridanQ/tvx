@@ -33,7 +33,7 @@ dwi_image = read_image(dwipath)
 dwi_mask_image = read_image(dwimaskpath)
 
 ref_image = read_image(ref_path)
-rotation_matrices = read_image
+rotation_matrices = read_image(rotationpath)
 
 inv_dp_image = read_image(inv_dp_path)
 inv_transform = get_displacement(inv_dp_image)
